@@ -1,3 +1,4 @@
+import os
 from threading import Timer
 from pinecone_index import PineconeIndex
 from clustering import Clustering
@@ -5,7 +6,11 @@ from sparse_priming import create_conjunctions
 from gpt3 import generate_response
 
 # Initialize Pinecone index
-pinecone_index = PineconeIndex(index_name="my-sample-index", api_key='your-api-key-here')
+pinecone_api_key = os.getenv("PINECONE_API_KEY")
+if not pinecone_api_key:
+    raise ValueError("PINECONE_API_KEY environment variable not set")
+
+pinecone_index = PineconeIndex(index_name="my-sample-index", api_key=pinecone_api_key)
 print(f"Pinecone index: {pinecone_index}")
 
 # Define data structures
@@ -70,15 +75,42 @@ def reindex():
 reindex_periodically()
 
 # Define chatbot function
-def chatbot(query):
-    # Search Pinecone index for closest KB article
-    result = pinecone_index.search(query)
-    closest_article = result['ids'][0]
+def chatbot(query: str) -> str:
+    """
+    Process a user query and generate a response.
 
-    # Use GPT-3 to generate response
-    response = generate_response(kb_articles[closest_article] + " " + query)
+    Args:
+        query: The user's question
 
-    return response
+    Returns:
+        The chatbot's response
+
+    Raises:
+        ValueError: If query is empty
+        RuntimeError: If search or response generation fails
+    """
+    if not query or not query.strip():
+        raise ValueError("Query cannot be empty")
+
+    try:
+        # Search Pinecone index for closest KB article
+        result = pinecone_index.search(query)
+
+        if not result or not result.get('ids'):
+            return "I'm sorry, I couldn't find any relevant information to answer your question."
+
+        closest_article = result['ids'][0]
+
+        # Check if article exists in KB
+        if closest_article not in kb_articles:
+            return "I'm sorry, I don't have enough information to answer that question yet."
+
+        # Use GPT-3 to generate response
+        response = generate_response(kb_articles[closest_article] + " " + query)
+        return response
+    except Exception as e:
+        print(f"Error in chatbot: {str(e)}")
+        return "I'm sorry, I encountered an error while processing your question."
 
 # Use chatbot to respond to user queries
 while True:

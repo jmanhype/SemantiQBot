@@ -1,6 +1,22 @@
 import re
+from typing import List
 
-def create_conjunctions(cluster):
+def create_conjunctions(cluster: List) -> List[List[int]]:
+    """
+    Create conjunctions for a cluster of rollups.
+
+    Args:
+        cluster: A list of rollup objects
+
+    Returns:
+        A sparse representation of conjunctions
+
+    Raises:
+        ValueError: If cluster is empty
+    """
+    if not cluster:
+        raise ValueError("Cluster cannot be empty")
+
     # Convert cluster roll-ups to a list of strings
     rollups = [str(rollup) for rollup in cluster]
 
