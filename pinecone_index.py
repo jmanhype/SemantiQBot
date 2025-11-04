@@ -1,18 +1,45 @@
 import pinecone
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Optional, Tuple
+import os
 
 class PineconeIndex:
-    def __init__(self, index_name, api_key):
+    """Manages a Pinecone vector index for semantic search."""
+
+    def __init__(self, index_name: str, api_key: str):
+        """
+        Initialize the Pinecone index.
+
+        Args:
+            index_name: Name of the Pinecone index
+            api_key: Pinecone API key
+
+        Raises:
+            ValueError: If index_name or api_key is empty
+        """
+        if not index_name:
+            raise ValueError("index_name cannot be empty")
+        if not api_key:
+            raise ValueError("api_key cannot be empty")
+
         self.index_name = index_name
         self.api_key = api_key
         self.model = SentenceTransformer('paraphrase-distilroberta-base-v2')
         embedding_dimension = self.model.get_sentence_embedding_dimension()
-        pinecone.init(api_key=self.api_key, environment='enviroment')
-        pinecone.create_index(index_name, dimension=embedding_dimension)
-        self.index = pinecone.Index(index_name=index_name)
-        self.vector_ids = set()
+
+        # Get environment from env var or use default
+        environment = os.getenv('PINECONE_ENVIRONMENT', 'us-west1-gcp')
+
+        try:
+            pinecone.init(api_key=self.api_key, environment=environment)
+            # Only create index if it doesn't exist
+            if index_name not in pinecone.list_indexes():
+                pinecone.create_index(index_name, dimension=embedding_dimension)
+            self.index = pinecone.Index(index_name=index_name)
+            self.vector_ids = set()
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize Pinecone index: {str(e)}") from e
 
     def fetch_or_create_embedding(self, document_id, document_text):
         if document_id in self.vector_ids:
@@ -22,7 +49,21 @@ class PineconeIndex:
             self.add_document(document_id, document_text)
             return embedding
 
-    def embed_text(self, text):
+    def embed_text(self, text: str) -> np.ndarray:
+        """
+        Embed text into a vector representation.
+
+        Args:
+            text: The text to embed
+
+        Returns:
+            The embedding vector
+
+        Raises:
+            ValueError: If text is empty
+        """
+        if not text:
+            raise ValueError("Text cannot be empty")
         return self.model.encode(text)
 
     def add_document(self, document_id, document):

@@ -1,3 +1,4 @@
+import os
 import pinecone
 from pinecone_index import PineconeIndex
 from clustering import cluster_rollups
@@ -6,8 +7,11 @@ from sparse_priming import sparse_priming
 class ReindexingEvent:
     def __init__(self):
         self.index_name = "my_index"
-        self.pinecone_client = pinecone.Client(api_key="<10bb0157-5371-4546-9116-b8323ab0ef78>")
-        self.index = PineconeIndex(self.index_name)
+        api_key = os.getenv("PINECONE_API_KEY")
+        if not api_key:
+            raise ValueError("PINECONE_API_KEY environment variable not set")
+        self.pinecone_client = pinecone.Client(api_key=api_key)
+        self.index = PineconeIndex(self.index_name, api_key=api_key)
 
     def run(self, rollups):
         # Step 1: Delete all existing documents in the Pinecone index
